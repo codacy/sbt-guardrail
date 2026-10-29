@@ -10,7 +10,7 @@ addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
 // Explicitly pinning this to a binding so we can grep for it.
 // Must be a version of com.codacy guardrail-core published to the Codacy private S3 bucket.
-val guardrailCoreVersion = "0.1.0-SNAPSHOT"
+val guardrailCoreVersion = "0.0.1"
 
 // The s3:// URL handler is only installed by the S3 resolver plugin in onLoad, i.e. after
 // build.sbt is evaluated, so `url("s3://...")` (and thus `privateMvnResolver`) fails here.
