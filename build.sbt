@@ -1,15 +1,17 @@
+import codacy.CodacySbt.autoImport._
+
 enablePlugins(SbtPlugin)
 
 name := "sbt-guardrail"
-ThisBuild / organization := "dev.guardrail"
+ThisBuild / organization := "com.codacy"
 description := "Principled code generation from OpenAPI specifications, sbt plugin"
-ThisBuild / homepage := Some(url("https://github.com/guardrail-dev/sbt-guardrail"))
-ThisBuild / licenses += ("MIT", url("https://github.com/guardrail-dev/guardrail/blob/master/LICENSE"))
+ThisBuild / homepage := Some(url("https://github.com/codacy/sbt-guardrail"))
+ThisBuild / licenses += ("MIT", url("https://github.com/codacy/guardrail/blob/master/LICENSE"))
 
 ThisBuild / scmInfo := Some(
   ScmInfo(
-    url("https://github.com/guardrail-dev/sbt-guardrail"),
-    "scm:git@github.com:guardrail-dev/sbt-guardrail.git"
+    url("https://github.com/codacy/sbt-guardrail"),
+    "scm:git@github.com:codacy/sbt-guardrail.git"
   )
 )
 
@@ -32,15 +34,7 @@ libraryDependencies ++= Seq(
     "org.scalatestplus" %% "scalacheck-1-19" % "3.2.19.0" % Test
   )
 
-// Versioning
-enablePlugins(GitBranchPrompt)
-enablePlugins(GitVersioning)
-
-git.gitUncommittedChanges := git.gitCurrentTags.value.isEmpty
-
 val commonSettings: SettingsDefinition = Seq(
-  // Release
-  publishMavenStyle := true,
   evictionErrorLevel := Level.Debug
 )
 
@@ -60,9 +54,13 @@ scriptedDependencies := {
 }
 
 lazy val root = (project in file("."))
+  .disablePlugins(codacy.CodacySbt) // only privateMvnPublish is wanted, not the plugin defaults (e.g. -Xfatal-warnings)
   .settings(commonSettings)
+  .settings(privateMvnPublish)
   .dependsOn(core)
   .aggregate(core)
 
 lazy val core = (project in file("modules/core"))
+  .disablePlugins(codacy.CodacySbt)
   .settings(commonSettings)
+  .settings(privateMvnPublish)
