@@ -6,7 +6,7 @@ enablePlugins(BuildInfoPlugin)
 name := "sbt-guardrail-core"
 description := "Core of sbt-guardrail plugin, for custom forks of guardrail"
 
-addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
+addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.4" cross CrossVersion.full)
 
 // Explicitly pinning this to a binding so we can grep for it.
 // Must be a version of com.codacy guardrail-core published to the Codacy private S3 bucket.
@@ -25,7 +25,7 @@ resolvers += {
 // Dependencies
 libraryDependencies ++= Seq(
   "com.codacy" %% "guardrail-core" % guardrailCoreVersion,
-  "org.snakeyaml" % "snakeyaml-engine" % "2.10"
+  "org.snakeyaml" % "snakeyaml-engine" % "3.2"
 )
 
 buildInfoKeys := Seq[BuildInfoKey](organization, version)
