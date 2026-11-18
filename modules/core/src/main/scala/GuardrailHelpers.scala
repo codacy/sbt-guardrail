@@ -34,6 +34,45 @@ object GuardrailHelpers {
     }.toOption.getOrElse(false)
   }
 
+  def referencedFiles(spec: File): Set[File] = {
+    @scala.annotation.tailrec
+    def loop(pending: List[File], seen: Set[File]): Set[File] = pending match {
+      case Nil => seen
+      case file :: rest if seen.contains(file) => loop(rest, seen)
+      case file :: rest => loop(externalRefs(file) ++ rest, seen + file)
+    }
+    val root = spec.getCanonicalFile
+    loop(externalRefs(root), Set(root)) - root
+  }
+
+  private def externalRefs(file: File): List[File] = {
+    import org.snakeyaml.engine.v2.api.{Load, LoadSettings}
+
+    import java.util.{IdentityHashMap, Collections, Map => JMap, List => JList}
+    import scala.jdk.CollectionConverters._
+
+    val visited = Collections.newSetFromMap(new IdentityHashMap[AnyRef, java.lang.Boolean]())
+    def refs(node: Any): List[String] = node match {
+      case m: JMap[_, _] if visited.add(m) =>
+        m.asScala.toList.flatMap {
+          case ("$ref", ref: String) => List(ref)
+          case (_, value) => refs(value)
+        }
+      case l: JList[_] if visited.add(l) => l.asScala.toList.flatMap(refs)
+      case _ => Nil
+    }
+
+    val docs =
+      try IO.reader(file)(reader => new Load(LoadSettings.builder().setAllowDuplicateKeys(true).build()).loadAllFromReader(reader).asScala.toList)
+      catch { case _: Exception => Nil }
+
+    docs.flatMap(refs).flatMap { ref =>
+      val path = ref.takeWhile(_ != '#')
+      if (path.isEmpty || path.contains("://")) None
+      else Some(new File(file.getParentFile, path).getCanonicalFile).filter(_.isFile)
+    }
+  }
+
   case class DiscoveredFile(base: File, file: File, fileRelative: File) {
     val fileRelativePath: String = fileRelative.getPath
     val fileRelativePathWithoutExtension: String = dropExtension(fileRelative.getPath)

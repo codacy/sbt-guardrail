@@ -188,6 +188,31 @@ trait AbstractGuardrailPlugin { self: AutoPlugin =>
     lazy val GuardrailHelpers = _root_.dev.guardrail.sbt.GuardrailHelpers
   }
 
+  // Generator jars are versioned apart from this plugin; their bump must invalidate the cache too.
+  private[this] def generatorFingerprint: String = {
+    val loader = classOf[_root_.io.swagger.parser.SwaggerParserExtension].getClassLoader
+    val services = List(
+      "ClientGeneratorLoader",
+      "CollectionsGeneratorLoader",
+      "CoreTermsLoader",
+      "FrameworkGeneratorLoader",
+      "FrameworkLoader",
+      "LanguageLoader",
+      "ModuleMapperLoader",
+      "ProtocolGeneratorLoader",
+      "ServerGeneratorLoader"
+    )
+    import scala.jdk.CollectionConverters._
+    val serviceUrls = services.flatMap(name => loader.getResources(s"META-INF/services/dev.guardrail.generators.spi.$name").asScala)
+    val ownUrls = List(classOf[GuardrailRunner], classOf[AbstractGuardrailPlugin]).flatMap(cls => Option(cls.getProtectionDomain.getCodeSource).map(_.getLocation))
+    val files = (serviceUrls ++ ownUrls).flatMap { url =>
+      val path = if (url.getProtocol == "jar") url.getPath.takeWhile(_ != '!') else url.toString
+      try Some(new java.io.File(new java.net.URI(path)))
+      catch { case _: Exception => None }
+    }.distinct.sortBy(_.getPath)
+    Hash.toHex(Hash(files.map(f => s"${f.getPath}:${f.length}:${f.lastModified}").mkString("\n")))
+  }
+
   def scopedSettings(scope: Configuration): SettingsDefinition = {
     import _root_.sbt.Keys.{resourceDirectory, sourceDirectory, unmanagedResourceDirectories, unmanagedSourceDirectories}
     Seq(
@@ -204,11 +229,13 @@ trait AbstractGuardrailPlugin { self: AutoPlugin =>
           .sub(SbtKeys.scalaBinaryVersion.value)
           .sub(BuildInfo.version)
           .sub(Hash.toHex(Hash(tasks.toString)))
+          .sub(generatorFingerprint)
         val output = (scope / Keys.guardrail / SbtKeys.sourceManaged).value
         val cached = FileFunction.cached(csf, inStyle = FileInfo.hash, outStyle = FileInfo.exists) { (_, _) =>
           Tasks.guardrailTask(runner.guardrailRunner)(tasks, output)
         }
-        cached((scope / Keys.guardrail / SbtNioKeys.allInputFiles).value.map(_.toFile).toSet).toSeq
+        val specs = (scope / Keys.guardrail / SbtNioKeys.allInputFiles).value.map(_.toFile).toSet
+        cached(specs ++ specs.flatMap(GuardrailHelpers.referencedFiles)).toSeq
       },
       scope / SbtKeys.sourceGenerators += (scope / Keys.guardrail).taskValue,
     )
